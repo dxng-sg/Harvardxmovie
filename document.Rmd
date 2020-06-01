@@ -1,0 +1,143 @@
+---
+title: "MovieLens Project"
+author: "Ng Da Xuan"
+date: "5/31/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction of dataset & Overview of the goal of current Project 
+
+The dataset used in this project came from the work of Harper & Konstan (2015). The dataset set is collected from a total of 71567 users, consists of 10000054 ratings, 95580 tags, and 10681 movies. The goal of the current project is to develop a Machine Learning model for the dataset that minimises the RMSE.
+
+The key steps taken to reach the goal were: 1)cleaning the data into a tidy format, 2) exploring the data and understanding the data structure, & 3) testing out different modelling approach to find the best predictive model (ie., lowest RMSE).
+
+The following are the libraries used in exploring the data. 
+
+```{r libraries, warning = FALSE, message=FALSE}
+library(matrixStats)
+library(tidyverse)
+library(caret)
+library(lubridate)
+library(knitr)
+library(rmarkdown)
+library(data.table)
+library(stringr)
+```
+
+## Methods & Analysis
+
+### Step 1: Cleaning the data into a tidy format
+
+* Download data
+```{r data source}
+dl <- tempfile()
+download.file("http://files.grouplens.org/datasets/movielens/ml-10m.zip", dl)
+
+```
+
+* Organising dataset into tidy format
+
+```{r organise data, tidy = TRUE}
+ratings <- fread(text = gsub("::", "\t", readLines(unzip(dl, "ml-10M100K/ratings.dat"))),
+                 col.names = c("userId", "movieId", "rating", "timestamp"))
+movies <- str_split_fixed(readLines(unzip(dl, "ml-10M100K/movies.dat")), "\\::", 3)
+colnames(movies) <- c("movieId", "title", "genres")
+movies <- as.data.frame(movies) %>%mutate(movieId =as.numeric(levels(movieId))[movieId],
+                                          title = as.character(title),
+                                          genres = as.character(genres))
+movielens <- left_join(ratings, movies, by = "movieId")
+```
+
+* Creating a validation dataset and edx dataset
+
+```{r create dataset, tidy = TRUE, warning=FALSE,message=FALSE}
+## Validation set will be 10% of MovieLens data
+set.seed(1, sample.kind="Rounding")
+test_index <- createDataPartition(y = movielens$rating, times = 1, p = 0.1, list = FALSE)
+edx <- movielens[-test_index,]
+temp <- movielens[test_index,]
+
+## Make sure userId and movieId in validation set are also in edx set
+validation <- temp %>% 
+  semi_join(edx, by = "movieId") %>%
+  semi_join(edx, by = "userId")
+
+## Add rows removed from validation set back into edx set
+removed <- anti_join(temp, validation)
+edx <- rbind(edx, removed)
+rm(dl, ratings, movies, test_index, temp, movielens, removed)
+```
+
+### Step 2: Exploring the edx dataset and understanding the data structure
+
+* Exploring the edx dataset
+
+```{r}
+## Exploring the datatype and type of variables in the dataset.
+str(edx)
+head(edx)
+
+## How many rows and columns are there in the edx dataset?
+dim(edx)
+
+## How many zeros were given as ratings in the edx dataset?
+edx %>% filter(rating == 0) %>% tally()
+
+## How many threes were given as ratings in the edx dataset?
+edx %>% filter(rating == 3) %>% tally()
+
+## How many different movies are in the edx dataset?
+n_distinct(edx$movieId)
+
+## How many different users are in the edx dataset?
+n_distinct(edx$userId)
+
+## How many movie ratings are in each of the following genres in the edx dataset?
+# str_detect
+genres = c("Drama", "Comedy", "Thriller", "Romance", "Action", "Sci-Fi", "Adventure", "Children", "Fantasy")
+sapply(genres, function(g) {
+  sum(str_detect(edx$genres, g))
+})
+
+## Which movie has the greatest number of ratings?
+edx %>% group_by(movieId, title) %>%
+  summarize(count = n()) %>%
+  arrange(desc(count))
+```
+
+```{r, results="hold", message=FALSE}
+## What are the five most given ratings in order from most to least?
+edx %>% group_by(rating) %>% summarize(count = n()) %>% top_n(5) %>%
+  arrange(desc(count))
+
+edx %>%
+  group_by(rating) %>%
+  summarize(count = n()) %>%
+  ggplot(aes(x = rating, y = count)) +
+  geom_line()
+```
+
+
+### Step 3: Testing out different modelling approach to find the best predictive model
+
+
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+## Results
+
+## Conclusion
+
+## References
+
+F. Maxwell Harper and Joseph A. Konstan. 2015. The MovieLens Datasets: History and Context. ACM Transactions on Interactive Intelligent Systems (TiiS) 5, 4, Article 19 (December 2015), 19 pages. DOI=http://dx.doi.org/10.1145/2827872
